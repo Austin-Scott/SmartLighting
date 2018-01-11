@@ -28,12 +28,13 @@ int lerp(int a, int b, float alpha) {
 	else return (int)(((1.0f - alpha)*(float)a) + (alpha*(float)b));
 }
 
-string executeSystemCommand(string cmd, bool timeouts=true) {
-	//cout << cmd << endl; //****DEBUGGING
-	
-#ifdef linux
-	if(timeouts)
+string executeSystemCommand(string cmd, bool timeouts = true) {
+	//cout << "Starting Command" << endl; //****DEBUGGING
+
+#ifdef __linux__
+	if (timeouts) {
 		cmd = "timeout 1s " + cmd;
+	}
 #endif
 
 
@@ -44,10 +45,13 @@ string executeSystemCommand(string cmd, bool timeouts=true) {
 	cmd.append(" 2>&1");
 	stream = popen(cmd.c_str(), "r");
 	if (stream) {
-		while (!feof(stream))
+		while (!feof(stream)) {
 			if (fgets(buffer, max_buffer, stream) != NULL) data.append(buffer);
+		}
+		//cout << "While loop finished" << endl;
 		pclose(stream);
 	}
+	//cout << "Command finished" << endl;
 	return data;
 }
 
@@ -267,6 +271,26 @@ private:
 			setHSB(lerpHSB(schedule.front()._sHSB, schedule.front()._eHSB, eventAlpha), deltaTimeInMilli);
 		}
 	}
+	void handleCommand(string command) {
+		do {
+			string response = executeSystemCommand(command);
+			if (response != "") {
+				//cout << response << endl;
+
+				Document doc;
+				doc.Parse(response.c_str());
+				updateState(doc.GetObject());
+				break;
+			}
+			else {
+				_connected = false;
+				cout << "Error: Smartbulb at ip " + _ip + " took too long to respond." << endl;
+				if (!allowTimeouts) {
+					cout << "Retrying command..." << endl;
+				}
+			}
+		} while (!allowTimeouts);
+	}
 
 public:
 	Lightbulb(string ip) {
@@ -405,53 +429,25 @@ public:
 			setHSB(state.getHue(), state.getSaturation(), state.getBrightness());
 		}
 		else { //the bulb was in white light mode
-			turnOn(state.getBrightness());
 			setTemp(state.getColorTemp());
+			turnOn(state.getBrightness());
 		}
 
 		if (!state.getIsOn()) turnOff();
+		
+		cout << "Restore state done" << endl;
 	}
 
 	void turnOn(int brightness = 100, int transition = 0) {
 		string command = "tplight on -t " + to_string(transition) + " -b " + to_string(brightness) + " " + _ip;
 
-		do {
-			string response = executeSystemCommand(command);
-			if (response != "") {
-				Document doc;
-				doc.Parse(response.c_str());
-				updateState(doc.GetObject());
-				break;
-			}
-			else {
-				_connected = false;
-				cout << "Error: Smartbulb at ip " + _ip + " took too long to respond." << endl;
-				if (allowTimeouts) {
-					cout << "Retrying command..." << endl;
-				}
-			}
-		} while (allowTimeouts);
+		handleCommand(command);
 	}
 
 	void turnOff(int transition = 0) {
 		string command = "tplight off -t " + to_string(transition) + " " + _ip;
 
-		do {
-			string response = executeSystemCommand(command);
-			if (response != "") {
-				Document doc;
-				doc.Parse(response.c_str());
-				updateState(doc.GetObject());
-				break;
-			}
-			else {
-				_connected = false;
-				cout << "Error: Smartbulb at ip " + _ip + " took too long to respond." << endl;
-				if (allowTimeouts) {
-					cout << "Retrying command..." << endl;
-				}
-			}
-		} while (allowTimeouts);
+		handleCommand(command);
 	}
 
 	void setColor(int r, int g, int b, int transition = 0) {
@@ -467,22 +463,7 @@ public:
 		string command = "tplight hex -t " + to_string(transition) + " " + _ip + " \"" + hex +"\"";
 
 
-		do {
-			string response = executeSystemCommand(command);
-			if (response != "") {
-				Document doc;
-				doc.Parse(response.c_str());
-				updateState(doc.GetObject());
-				break;
-			}
-			else {
-				_connected = false;
-				cout << "Error: Smartbulb at ip " + _ip + " took too long to respond." << endl;
-				if (allowTimeouts) {
-					cout << "Retrying command..." << endl;
-				}
-			}
-		} while (allowTimeouts);
+		handleCommand(command);
 	}
 
 	void setHSB(int h, int s, int b, int transition = 0) {
@@ -497,22 +478,7 @@ public:
 		}
 		string command = "tplight hsb -t " + to_string(transition) + " " + _ip + " " + to_string(c.h) + " " + to_string(c.s) + " " + to_string(c.b);
 
-		do {
-			string response = executeSystemCommand(command);
-			if (response != "") {
-				Document doc;
-				doc.Parse(response.c_str());
-				updateState(doc.GetObject());
-				break;
-			}
-			else {
-				_connected = false;
-				cout << "Error: Smartbulb at ip " + _ip + " took too long to respond." << endl;
-				if (allowTimeouts) {
-					cout << "Retrying command..." << endl;
-				}
-			}
-		} while (allowTimeouts);
+		handleCommand(command);
 	}
 
 	void setTemp(int k, int transition = 0) {
@@ -522,22 +488,7 @@ public:
 		}
 		string command = "tplight temp " + _ip + " -t " + to_string(transition) + " " + to_string(k);
 
-		do {
-			string response = executeSystemCommand(command);
-			if (response != "") {
-				Document doc;
-				doc.Parse(response.c_str());
-				updateState(doc.GetObject());
-				break;
-			}
-			else {
-				_connected = false;
-				cout << "Error: Smartbulb at ip " + _ip + " took too long to respond." << endl;
-				if (allowTimeouts) {
-					cout << "Retrying command..." << endl;
-				}
-			}
-		} while (allowTimeouts);
+		handleCommand(command);
 	}
 
 	void updateBySchedule(int deltaTimeInMilli, bool allowEventSkip=true) {
