@@ -33,7 +33,7 @@ string executeSystemCommand(string cmd, bool timeouts = true) {
 
 #ifdef __linux__
 	if (timeouts) {
-		cmd = "timeout 1s " + cmd;
+		cmd = "timeout 4s " + cmd;
 	}
 #endif
 
